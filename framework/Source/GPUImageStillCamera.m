@@ -326,7 +326,7 @@ void GPUImageCreateResizedSampleBuffer(CVPixelBufferRef cameraFrame, CGSize fina
         
         CFDictionaryRef metadata = CMCopyDictionaryOfAttachments(NULL, imageSampleBuffer, kCMAttachmentMode_ShouldPropagate);
         _currentCaptureMetadata = (__bridge_transfer NSDictionary *)metadata;
-
+        
         block(nil);
 
         _currentCaptureMetadata = nil;
