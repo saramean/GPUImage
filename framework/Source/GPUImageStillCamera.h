@@ -8,9 +8,11 @@ void GPUImageCreateResizedSampleBuffer(CVPixelBufferRef cameraFrame, CGSize fina
 /** The JPEG compression quality to use when capturing a photo as a JPEG.
  */
 @property CGFloat jpegCompressionQuality;
+@property (assign) BOOL keepOriginalImageData;
 
 // Only reliably set inside the context of the completion handler of one of the capture methods
 @property (readonly) NSDictionary *currentCaptureMetadata;
+@property (readonly) NSData *originalImageData;
 
 // Photography controls
 - (void)capturePhotoAsSampleBufferWithCompletionHandler:(void (^)(CMSampleBufferRef imageSampleBuffer, NSError *error))block;

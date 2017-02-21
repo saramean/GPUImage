@@ -1,6 +1,7 @@
 #import "GPUImageVideoCamera.h"
 #import "GPUImageMovieWriter.h"
 #import "GPUImageFilter.h"
+#import <ImageIO/ImageIO.h>
 
 void setColorConversion601( GLfloat conversionMatrix[9] )
 {
@@ -39,6 +40,8 @@ void setColorConversion709( GLfloat conversionMatrix[9] )
     int imageBufferWidth, imageBufferHeight;
     
     BOOL addedAudioInputsDueToEncodingTarget;
+    
+    CIDetector *faceDetector;
 }
 
 - (void)updateOrientationSendToTargets;
@@ -76,7 +79,6 @@ void setColorConversion709( GLfloat conversionMatrix[9] )
     {
 		return nil;
     }
-    
     cameraProcessingQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH,0);
 	audioProcessingQueue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW,0);
 

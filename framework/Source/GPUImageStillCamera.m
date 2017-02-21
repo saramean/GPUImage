@@ -1,6 +1,8 @@
 // 2448x3264 pixel image = 31,961,088 bytes for uncompressed RGBA
 
 #import "GPUImageStillCamera.h"
+#import <ImageIO/ImageIO.h>
+#import <MobileCoreServices/MobileCoreServices.h>
 
 void stillImageDataReleaseCallback(void *releaseRefCon, const void *baseAddress)
 {
@@ -45,6 +47,7 @@ void GPUImageCreateResizedSampleBuffer(CVPixelBufferRef cameraFrame, CGSize fina
 @interface GPUImageStillCamera ()
 {
     AVCaptureStillImageOutput *photoOutput;
+    CIContext *context;
 }
 
 // Methods calling this are responsible for calling dispatch_semaphore_signal(frameRenderingSemaphore) somewhere inside the block
@@ -58,6 +61,8 @@ void GPUImageCreateResizedSampleBuffer(CVPixelBufferRef cameraFrame, CGSize fina
 
 @synthesize currentCaptureMetadata = _currentCaptureMetadata;
 @synthesize jpegCompressionQuality = _jpegCompressionQuality;
+@synthesize originalImageData = _originalImageData;
+@synthesize keepOriginalImageData = _keepOriginalImageData;
 
 #pragma mark -
 #pragma mark Initialization and teardown
@@ -68,7 +73,6 @@ void GPUImageCreateResizedSampleBuffer(CVPixelBufferRef cameraFrame, CGSize fina
     {
 		return nil;
     }
-    
     /* Detect iOS version < 6 which require a texture cache corruption workaround */
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -78,7 +82,14 @@ void GPUImageCreateResizedSampleBuffer(CVPixelBufferRef cameraFrame, CGSize fina
     [self.captureSession beginConfiguration];
     
     photoOutput = [[AVCaptureStillImageOutput alloc] init];
+    
+    _keepOriginalImageData = NO;
    
+    //CIContext
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    context = [CIContext contextWithOptions:@{(id)kCIContextWorkingColorSpace:(__bridge id)colorSpace}];
+    CGColorSpaceRelease(colorSpace);
+    
     // Having a still photo input set to BGRA and video to YUV doesn't work well, so since I don't have YUV resizing for iPhone 4 yet, kick back to BGRA for that device
 //    if (captureAsYUV && [GPUImageContext supportsFastTextureUpload])
     if (captureAsYUV && [GPUImageContext deviceSupportsRedTextures])
@@ -285,9 +296,13 @@ void GPUImageCreateResizedSampleBuffer(CVPixelBufferRef cameraFrame, CGSize fina
             block(error);
             return;
         }
-
+        
         // For now, resize photos to fix within the max texture size of the GPU
         CVImageBufferRef cameraFrame = CMSampleBufferGetImageBuffer(imageSampleBuffer);
+        
+        if(_keepOriginalImageData){
+            _originalImageData = [self imageDataFromPixelBuffer:cameraFrame];
+        }
         
         CGSize sizeOfPhoto = CGSizeMake(CVPixelBufferGetWidth(cameraFrame), CVPixelBufferGetHeight(cameraFrame));
         CGSize scaledImageSizeToFitOnGPU = [GPUImageContext sizeThatFitsWithinATextureForSize:sizeOfPhoto];
@@ -333,6 +348,24 @@ void GPUImageCreateResizedSampleBuffer(CVPixelBufferRef cameraFrame, CGSize fina
     }];
 }
 
-
-
+- (NSData *) imageDataFromPixelBuffer:(CVImageBufferRef) pixelBuffer {
+    NSDate *start = [NSDate date];
+    
+    CIImage *ciImage = [CIImage imageWithCVImageBuffer:pixelBuffer];
+    CGImageRef cgImage = [context createCGImage:ciImage fromRect:ciImage.extent];
+    CFMutableDataRef imageDataRef = CFDataCreateMutable(NULL, 0);
+    CGImageDestinationRef destination = CGImageDestinationCreateWithData(imageDataRef, kUTTypeJPEG, 1, NULL);
+    CGImageDestinationAddImage(destination, cgImage, nil);
+    CGImageDestinationFinalize(destination);
+    NSData *imageData = (__bridge NSData *)imageDataRef;
+    CGImageRelease(cgImage);
+    CFRelease(destination);
+    CFRelease(imageDataRef);
+    
+    NSDate *end = [NSDate date];
+    NSTimeInterval interval = [end timeIntervalSinceDate:start];
+    NSLog(@"converting time %f", interval);
+    
+    return imageData;
+}
 @end
